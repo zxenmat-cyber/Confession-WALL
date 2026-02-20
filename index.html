@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANONYMOUS PINOY CONFESSION</title>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+background:linear-gradient(135deg,#000,#4b0082);
+color:white;
+text-align:center;
+}
+
+h1{ text-shadow:0 0 10px violet; }
+
+.container{
+width:95%;
+max-width:600px;
+margin:auto;
+margin-top:15px;
+}
+
+.card{
+background:rgba(255,255,255,0.1);
+padding:15px;
+border-radius:10px;
+margin:10px 0;
+}
+
+input,select,textarea,button{
+width:100%;
+padding:10px;
+margin:5px 0;
+border:none;
+border-radius:5px;
+}
+
+button{
+background:violet;
+color:black;
+font-weight:bold;
+cursor:pointer;
+}
+
+.hidden{ display:none; }
+
+.confession{
+text-align:left;
+padding:10px;
+margin:10px 0;
+background:rgba(255,255,255,0.1);
+border-radius:10px;
+}
+
+.small{ font-size:12px; opacity:0.7; }
+
+.username{
+color:violet;
+cursor:pointer;
+font-weight:bold;
+}
+
+.nav{
+display:flex;
+justify-content:space-between;
+gap:5px;
+}
+
+.chatBox{
+max-height:250px;
+overflow:auto;
+background:rgba(0,0,0,0.4);
+padding:10px;
+border-radius:10px;
+text-align:left;
+}
+
+.me{ text-align:right; color:violet; }
+.other{ text-align:left; color:white; }
+
+.action-btn{
+background:none;
+color:violet;
+border:none;
+cursor:pointer;
+margin-right:10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>ANONYMOUS PINOY CONFESSION</h1>
+<p>Speak freely. Stay anonymous.</p>
+
+<div class="container">
+
+<!-- START -->
+<div id="startPage" class="card">
+<button onclick="showLogin()">Login</button>
+<button onclick="showRegister()">Register</button>
+</div>
+
+<!-- LOGIN -->
+<div id="loginPage" class="card hidden">
+<input id="loginUser" placeholder="Username">
+<input type="password" id="loginPass" placeholder="Password">
+<button onclick="login()">Login</button>
+<button onclick="back()">Back</button>
+</div>
+
+<!-- REGISTER -->
+<div id="registerPage" class="card hidden">
+<input id="regUser" placeholder="Username">
+<input type="password" id="regPass" placeholder="Password">
+<button onclick="register()">Register</button>
+<button onclick="back()">Back</button>
+</div>
+
+<!-- APP -->
+<div id="appPage" class="hidden">
+
+<div class="card nav">
+<button onclick="showFeed()">🏠 Feed</button>
+<button onclick="showMessages()">💬 Messages</button>
+<button onclick="logout()">Logout</button>
+</div>
+
+<!-- FEED -->
+<div id="feedPage">
+
+<div class="card">
+<h3>Submit Confession</h3>
+<select id="category">
+<option>Love</option>
+<option>School</option>
+<option>Family</option>
+<option>Work</option>
+<option>Random</option>
+</select>
+<textarea id="confessionText" placeholder="Write confession..."></textarea>
+<button onclick="addConfession()">Post</button>
+</div>
+
+<div id="confessionList"></div>
+
+</div>
+
+<!-- MESSAGE PAGE -->
+<div id="messagePage" class="hidden">
+
+<div class="card">
+<h3>Private Messages</h3>
+<div id="userList"></div>
+</div>
+
+<div class="card hidden" id="chatArea">
+<h4>Chat with <span id="chatUser"></span></h4>
+<div class="chatBox" id="chatBox"></div>
+<input id="chatInput" placeholder="Type message...">
+<button onclick="sendMessage()">Send</button>
+</div>
+
+</div>
+
+</div>
+</div>
+
+<script>
+
+let users=JSON.parse(localStorage.getItem("users"))||[];
+let confessions=JSON.parse(localStorage.getItem("confessions"))||[];
+let messages=JSON.parse(localStorage.getItem("messages"))||[];
+let likes=JSON.parse(localStorage.getItem("likes"))||{};
+let comments=JSON.parse(localStorage.getItem("comments"))||{};
+let currentUser=localStorage.getItem("currentUser");
+let activeChat=null;
+
+/* PAGE SWITCH */
+function showLogin(){hideAll();loginPage.classList.remove("hidden");}
+function showRegister(){hideAll();registerPage.classList.remove("hidden");}
+function back(){hideAll();startPage.classList.remove("hidden");}
+function hideAll(){
+startPage.classList.add("hidden");
+loginPage.classList.add("hidden");
+registerPage.classList.add("hidden");
+}
+
+function showFeed(){
+feedPage.classList.remove("hidden");
+messagePage.classList.add("hidden");
+}
+
+function showMessages(){
+feedPage.classList.add("hidden");
+messagePage.classList.remove("hidden");
+loadUserList();
+}
+
+/* AUTH */
+function register(){
+if(!regUser.value||!regPass.value){alert("Fill all");return;}
+if(users.find(u=>u.username===regUser.value)){alert("Username exists");return;}
+users.push({username:regUser.value,password:regPass.value});
+localStorage.setItem("users",JSON.stringify(users));
+alert("Registered!");
+back();
+}
+
+function login(){
+let found=users.find(u=>u.username===loginUser.value&&u.password===loginPass.value);
+if(found){localStorage.setItem("currentUser",found.username);location.reload();}
+else alert("Invalid login");
+}
+
+function logout(){localStorage.removeItem("currentUser");location.reload();}
+
+/* CONFESSION */
+function addConfession(){
+if(!confessionText.value.trim()){alert("Type something");return;}
+confessions.unshift({
+user:currentUser,
+category:category.value,
+text:confessionText.value,
+date:new Date().toLocaleString()
+});
+localStorage.setItem("confessions",JSON.stringify(confessions));
+confessionText.value="";
+displayConfessions();
+}
+
+function likePost(index){
+if(!likes[currentUser]) likes[currentUser]=[];
+if(likes[currentUser].includes(index)){alert("One like only ❤️");return;}
+likes[currentUser].push(index);
+localStorage.setItem("likes",JSON.stringify(likes));
+displayConfessions();
+}
+
+function addComment(index){
+let text=prompt("Enter comment:");
+if(!text)return;
+if(!comments[index]) comments[index]=[];
+comments[index].push({user:currentUser,text});
+localStorage.setItem("comments",JSON.stringify(comments));
+displayConfessions();
+}
+
+function displayConfessions(){
+confessionList.innerHTML="";
+confessions.forEach((c,index)=>{
+let likeCount=Object.values(likes).filter(arr=>arr.includes(index)).length;
+let commentCount=comments[index]?comments[index].length:0;
+
+confessionList.innerHTML+=`
+<div class="confession">
+<span class="username" onclick="openChat('${c.user}')">${c.user}</span>
+| <span class="small">${c.category}</span>
+<p>${c.text}</p>
+<div class="small">${c.date}</div>
+<button class="action-btn" onclick="likePost(${index})">❤️ ${likeCount}</button>
+<button class="action-btn" onclick="addComment(${index})">💬 ${commentCount}</button>
+<button class="action-btn" onclick="openChat('${c.user}')">💌 Message</button>
+</div>
+`;
+});
+}
+
+/* CHAT */
+function openChat(user){
+if(user===currentUser){alert("You cannot message yourself");return;}
+activeChat=user;
+showMessages();
+chatArea.classList.remove("hidden");
+chatUser.innerText=user;
+loadMessages();
+}
+
+function loadUserList(){
+userList.innerHTML="";
+let list=[...new Set(messages
+.filter(m=>m.from===currentUser||m.to===currentUser)
+.map(m=>m.from===currentUser?m.to:m.from)
+)];
+list.forEach(u=>{
+userList.innerHTML+=`<div class="username" onclick="openChat('${u}')">${u}</div>`;
+});
+}
+
+function sendMessage(){
+if(!chatInput.value.trim())return;
+messages.push({from:currentUser,to:activeChat,text:chatInput.value});
+localStorage.setItem("messages",JSON.stringify(messages));
+chatInput.value="";
+loadMessages();
+}
+
+function loadMessages(){
+chatBox.innerHTML="";
+messages.forEach(m=>{
+if((m.from===currentUser&&m.to===activeChat)||(m.from===activeChat&&m.to===currentUser)){
+chatBox.innerHTML+=`<div class="${m.from===currentUser?'me':'other'}">${m.text}</div>`;
+}
+});
+chatBox.scrollTop=chatBox.scrollHeight;
+}
+
+/* AUTO LOGIN */
+function checkLogin(){
+if(currentUser){
+startPage.classList.add("hidden");
+appPage.classList.remove("hidden");
+displayConfessions();
+}
+}
+
+checkLogin();
+
+</script>
+</body>
+</html>
